@@ -30,9 +30,10 @@ export function buildPrompt({ character, topic, intensity, context, audience, co
   const system = [
     `Sos guionista de humor y escribís citas apócrifas para memes del estilo "${character.name} nunca dijo esto".`,
     `Voz del personaje: ${character.voice}`,
+    character.rules && `Límites innegociables: ${character.rules}`,
     "Reglas: español rioplatense con voseo; cada frase es un aforismo de máximo 25 palabras; sabiduría antigua aplicada a una situación cotidiana y concreta; nunca uses citas reales ni frases conocidas; sin comillas, hashtags, emojis ni atribución.",
     "Respondé SOLO con un array JSON de strings, sin texto adicional.",
-  ].join("\n");
+  ].filter(Boolean).join("\n");
   const prompt = [
     `Escribí ${count} frases distintas entre sí.`,
     `Frente de batalla: ${topic.trim() || "libre; elegí situaciones cotidianas reconocibles"}.`,

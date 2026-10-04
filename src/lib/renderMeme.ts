@@ -61,7 +61,9 @@ export function renderMeme(ctx: CanvasRenderingContext2D, { character, quote, st
     ctx.drawImage(portrait, (620 - w) / 2, S - h, w, h);
   }
 
-  const textX = 860, textW = 520, top = 230, bottom = 960;
+  // Sin retrato ni fondo no hay nada a la izquierda: el texto ocupa todo el ancho.
+  const solo = !portrait && !background;
+  const textX = solo ? S / 2 : 860, textW = solo ? 860 : 520, top = 230, bottom = 960;
   ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
   ctx.shadowColor = background ? "rgba(0,0,0,.6)" : "transparent"; ctx.shadowBlur = background ? 14 : 0;
 
