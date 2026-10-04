@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Memeitor — Sun Tzu nunca dijo esto",
-  description: "Generador de citas apócrifas para batallas que no merecían estrategia.",
+  title: "Memeitor — Nunca dijo esto",
+  description: "Generador de citas apócrifas de Sun Tzu, Confucio, Maquiavelo y compañía.",
   icons: { icon: "/favicon.svg" },
 };
 
