@@ -1,8 +1,8 @@
 "use client";
 
 /* eslint-disable @next/next/no-img-element */
-import { useCallback, useEffect, useRef, useState } from "react";
-import { characters } from "@/lib/characters";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { characters, customCharacter, CUSTOM_ID } from "@/lib/characters";
 import { audiences, listModels, llmProviders, requestQuotes, type Audience, type LlmProvider } from "@/lib/llm";
 import { loadRemembered, rememberKeys, rememberOptions, type ApiKeys, type RememberMode } from "@/lib/keyStore";
 import { loadImage, MEME_SIZE, renderMeme, styles } from "@/lib/renderMeme";
@@ -11,12 +11,17 @@ function Shortcuts() {
   return <div className="shortcuts"><span><kbd>Ctrl</kbd>+<kbd>C</kbd> copiar imagen</span><span><kbd>Ctrl</kbd>+<kbd>V</kbd> pegar fondo</span></div>;
 }
 
+function EmptyAvatar() {
+  return <span className="avatar-empty" aria-hidden="true">?</span>;
+}
+
 function canvasToBlob(canvas: HTMLCanvasElement) {
   return new Promise<Blob>((resolve, reject) => canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("No se pudo generar el PNG"))), "image/png"));
 }
 
 export default function Home() {
   const [characterId, setCharacterId] = useState(characters[0].id);
+  const [customName, setCustomName] = useState("");
   const [topic, setTopic] = useState("reuniones que podrían ser un mail");
   const [intensity, setIntensity] = useState(62);
   const [style, setStyle] = useState("lacra");
@@ -42,7 +47,7 @@ export default function Home() {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const toastTimer = useRef<number | undefined>(undefined);
   const keysLoaded = useRef(false);
-  const character = characters.find((item) => item.id === characterId) ?? characters[0];
+  const character = useMemo(() => characterId === CUSTOM_ID ? customCharacter(customName) : characters.find((item) => item.id === characterId) ?? characters[0], [characterId, customName]);
   const currentStyle = styles.find((item) => item.key === style) ?? styles[0];
   const apiKey = apiKeys[provider] ?? "";
 
@@ -59,6 +64,7 @@ export default function Home() {
   }, [flash]);
 
   useEffect(() => {
+    if (!character.image) return;
     let alive = true;
     loadImage(character.image).then((img) => { if (alive) setPortrait({ src: character.image, img }); }).catch(() => { if (alive) setPortrait(null); });
     return () => { alive = false; };
@@ -93,7 +99,7 @@ export default function Home() {
   useEffect(() => () => { if (background) URL.revokeObjectURL(background.src); }, [background]);
 
   function selectCharacter(id: string) {
-    const next = characters.find((item) => item.id === id); if (!next) return;
+    const next = id === CUSTOM_ID ? customCharacter(customName) : characters.find((item) => item.id === id); if (!next) return;
     setCharacterId(id); setQuote(next.quotes[0]); setSuggestions([]);
   }
 
@@ -155,12 +161,13 @@ export default function Home() {
   }
 
   const toastNode = <div className={`toast ${toast ? "visible" : ""}`} role="status" aria-live="polite">{toast}</div>;
+  const customField = <div className="custom-name"><label htmlFor="custom-name">¿Quién nunca lo dijo?</label><input id="custom-name" autoFocus maxLength={40} value={customName} onChange={(e) => setCustomName(e.target.value)} placeholder="Ej.: el de la foto, mi jefe, Messi" /><p className="hint">Sin retrato: ideal si el personaje ya está en la imagen de fondo (<kbd>Ctrl</kbd>+<kbd>V</kbd>).</p></div>;
   const providerName = llmProviders.find((item) => item.key === provider)?.name;
 
   return <main className="app-shell">
     <nav className="topbar" aria-label="Navegación principal"><a className="brand" href="#inicio"><span className="brand-mark">M</span><span>memeitor</span></a><span className="beta">LABORATORIO DE MEMES</span><button className="ghost-button" type="button" onClick={copyQuote}>Copiar cita</button></nav>
     <section id="inicio" className="intro"><div><p className="eyebrow">HERRAMIENTA 01 / CITAS APÓCRIFAS</p><h1>{character.name} nunca dijo<br /><em>esto.</em></h1></div><p className="intro-copy">Frases tácticas para batallas que no merecían estrategia. Elegí al sabio, escribí o generá la cita, pegá un fondo con <kbd>Ctrl</kbd>+<kbd>V</kbd> y copiala con <kbd>Ctrl</kbd>+<kbd>C</kbd>.</p></section>
-    <section className="gallery" aria-label="Galería de personajes"><div className="section-label"><span>00</span> ELEGIR AL SABIO</div><div className="gallery-grid">{characters.map((item) => <button key={item.id} className={`character-card ${item.id === characterId ? "selected" : ""}`} type="button" onClick={() => selectCharacter(item.id)} aria-pressed={item.id === characterId}><img src={item.image} alt="" /><span>{item.name}</span></button>)}</div></section>
+    <section className="gallery" aria-label="Galería de personajes"><div className="section-label"><span>00</span> ELEGIR AL SABIO</div><div className="gallery-grid">{characters.map((item) => <button key={item.id} className={`character-card ${item.id === characterId ? "selected" : ""}`} type="button" onClick={() => selectCharacter(item.id)} aria-pressed={item.id === characterId}><img src={item.image} alt="" /><span>{item.name}</span></button>)}<button className={`character-card custom ${characterId === CUSTOM_ID ? "selected" : ""}`} type="button" onClick={() => selectCharacter(CUSTOM_ID)} aria-pressed={characterId === CUSTOM_ID}><EmptyAvatar /><span>{customName.trim() || "Sin avatar"}</span></button></div>{characterId === CUSTOM_ID && !generatorOpen && customField}</section>
     <section className="workspace" aria-label="Meme">
       <aside className="side-panel">
         <div className="section-label"><span>01</span> PREPARAR EL DESASTRE</div>
@@ -182,7 +189,8 @@ export default function Home() {
         <header className="generator-head"><div><p className="eyebrow">GENERADOR</p><h2 id="generator-title">{character.name} nunca dijo…</h2></div><button className="ghost-button" type="button" onClick={() => dialogRef.current?.close()}>Cerrar <span aria-hidden="true">✕</span></button></header>
         <div className="generator-body">
           <div className="controls generator-form">
-            <span className="input-label">Personaje</span><div className="character-chips">{characters.map((item) => <button key={item.id} className={`character-chip ${item.id === characterId ? "selected" : ""}`} type="button" onClick={() => selectCharacter(item.id)} aria-pressed={item.id === characterId}><img src={item.image} alt="" /><span>{item.name}</span></button>)}</div>
+            <span className="input-label">Personaje</span><div className="character-chips">{characters.map((item) => <button key={item.id} className={`character-chip ${item.id === characterId ? "selected" : ""}`} type="button" onClick={() => selectCharacter(item.id)} aria-pressed={item.id === characterId}><img src={item.image} alt="" /><span>{item.name}</span></button>)}<button className={`character-chip ${characterId === CUSTOM_ID ? "selected" : ""}`} type="button" onClick={() => selectCharacter(CUSTOM_ID)} aria-pressed={characterId === CUSTOM_ID}><EmptyAvatar /><span>{customName.trim() || "Sin avatar"}</span></button></div>
+            {characterId === CUSTOM_ID && generatorOpen && customField}
             <label htmlFor="quote">La frase</label><textarea id="quote" rows={3} value={quote} onChange={(e) => setQuote(e.target.value)} placeholder="Escribí lo que nunca dijo" />
 
             <details className="ai-panel"><summary>Conexión IA <span>{providerName} · {apiKey.trim() ? "KEY CARGADA" : "SIN KEY"}</span></summary>
